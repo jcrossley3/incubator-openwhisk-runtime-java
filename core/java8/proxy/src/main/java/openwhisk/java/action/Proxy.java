@@ -22,6 +22,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.File;
 import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
@@ -48,6 +49,7 @@ public class Proxy {
 
         this.server.createContext("/init", new InitHandler());
         this.server.createContext("/run", new RunHandler());
+        this.server.createContext("/", new RunHandler());
         this.server.setExecutor(null); // creates a default executor
     }
 
@@ -74,6 +76,16 @@ public class Proxy {
         System.err.println("XXX_THE_END_OF_A_WHISK_ACTIVATION_XXX");
         System.out.flush();
         System.err.flush();
+    }
+
+    private boolean loadFromEnvironment() throws Exception {
+        String path = System.getenv("ACTION_JAR_PATH");
+        String main = System.getenv("ACTION_JAR_MAIN");
+        if (path != null) {
+            File file = new File(path);
+            loader = new JarLoader(file.toPath(), main);
+        }
+        return loader != null;
     }
 
     private class InitHandler implements HttpHandler {
@@ -127,15 +139,14 @@ public class Proxy {
 
     private class RunHandler implements HttpHandler {
         public void handle(HttpExchange t) throws IOException {
-            if (loader == null) {
-                Proxy.writeError(t, "Cannot invoke an uninitialized action.");
-                return;
-            }
-
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             SecurityManager sm = System.getSecurityManager();
 
             try {
+                if (loader == null && !loadFromEnvironment()) {
+                    Proxy.writeError(t, "Cannot invoke an uninitialized action.");
+                    return;
+                }
                 InputStream is = t.getRequestBody();
                 JsonParser parser = new JsonParser();
                 JsonObject body = parser.parse(new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))).getAsJsonObject();
