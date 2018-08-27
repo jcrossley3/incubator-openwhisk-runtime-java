@@ -149,8 +149,15 @@ public class Proxy {
                 }
                 InputStream is = t.getRequestBody();
                 JsonParser parser = new JsonParser();
-                JsonObject body = parser.parse(new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))).getAsJsonObject();
+                JsonElement ie = parser.parse(new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8)));
+                JsonObject body = new JsonObject();
+                if (ie.isJsonObject()) {
+                    body = ie.getAsJsonObject();
+                }
                 JsonObject inputObject = body.getAsJsonObject("value");
+                if (inputObject == null) {
+                    inputObject = body;
+                }
 
                 HashMap<String, String> env = new HashMap<String, String>();
                 Set<Map.Entry<String, JsonElement>> entrySet = body.entrySet();
